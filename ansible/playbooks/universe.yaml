@@ -26,6 +26,15 @@
       private: false
       default: y
   pre_tasks:
+    - name: Report loaded proxy configuration
+      ansible.builtin.debug:
+        msg: "Proxy configuration loaded: {{ item }} (network connectivity has not been tested)."
+      loop:
+        - http_proxy
+        - https_proxy
+        - all_proxy
+      when: (lookup('env', item) or lookup('env', item | upper)) | length > 0
+
     - name: Verify OS
       ansible.builtin.fail:
         msg: Only Ubuntu 22.04 and 24.04 are supported for this branch. Please refer to https://autowarefoundation.github.io/autoware-documentation/main/installation/autoware/source-installation/.
