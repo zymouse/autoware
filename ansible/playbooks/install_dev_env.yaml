@@ -72,3 +72,7 @@
     # Sample maps and rosbag recordings for demos (opt-in)
     - role: autoware.dev_env.demo_artifacts
       tags: [never, demo_artifacts]
+
+    # Update factory jtop only when an older installation exists.
+    - role: autoware.dev_env.jtop
+      tags: [universe, jtop]

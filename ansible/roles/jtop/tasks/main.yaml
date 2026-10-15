@@ -1,0 +1,40 @@
+- name: Check installed system jetson-stats version
+  become: true
+  become_user: root
+  ansible.builtin.command:
+    argv: [/usr/bin/python3, -I, -m, pip, --isolated, show, jetson-stats]
+  environment:
+    LC_ALL: C
+  register: jtop_package_info
+  changed_when: false
+  check_mode: false
+  failed_when: >-
+    jtop_package_info.rc != 0 and
+    not (jtop_package_info.rc == 1 and
+         'Package(s) not found: jetson-stats' in jtop_package_info.stderr)
+
+- name: Update existing jetson-stats installation
+  when: jtop_package_info.rc == 0
+  block:
+    - name: Read installed jetson-stats version
+      ansible.builtin.set_fact:
+        jtop_installed_version: >-
+          {{ jtop_package_info.stdout_lines | select('match', '^Version: ')
+             | map('regex_replace', '^Version: ', '') | first }}
+
+    - name: Upgrade jetson-stats older than 7.2.2
+      when: jtop_installed_version is version('7.2.2', '<')
+      block:
+        - name: Upgrade system jetson-stats
+          become: true
+          become_user: root
+          ansible.builtin.command:
+            argv: [/usr/bin/python3, -I, -m, pip, --isolated, install, -U, jetson-stats, --break-system-packages]
+          changed_when: true
+
+        - name: Restart jtop service after successful upgrade
+          become: true
+          become_user: root
+          ansible.builtin.systemd:
+            name: jtop.service
+            state: restarted

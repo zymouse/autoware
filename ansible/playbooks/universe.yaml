@@ -68,3 +68,7 @@
 
     # Qt5ct setup (RViz theme)
     - role: autoware.dev_env.qt5ct_setup
+
+    # Update factory jtop only when an older installation exists.
+    - role: autoware.dev_env.jtop
+      tags: [universe, jtop]
