@@ -118,6 +118,13 @@
     state: present
   become: true
 
+- name: Install ROS {{ rosdistro }} Agnocast package
+  ansible.builtin.apt:
+    name: "{{ agnocast_ros_package }}"
+    state: present
+  become: true
+  when: rosdistro == 'jazzy'
+
 # Detect container environment
 - name: Check if running in a container using systemd-detect-virt
   ansible.builtin.command: systemd-detect-virt -c

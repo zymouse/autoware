@@ -4,15 +4,17 @@
 - name: Set up source development environments for Autoware Universe
   hosts: localhost
   connection: local
+  vars:
+    cuda_install_drivers: false
+  environment:
+    http_proxy: "{{ lookup('env', 'http_proxy') or lookup('env', 'HTTP_PROXY') }}"
+    https_proxy: "{{ lookup('env', 'https_proxy') or lookup('env', 'HTTPS_PROXY') }}"
+    all_proxy: "{{ lookup('env', 'all_proxy') or lookup('env', 'ALL_PROXY') }}"
+    no_proxy: "{{ lookup('env', 'no_proxy') or lookup('env', 'NO_PROXY') }}"
   module_defaults:
     ansible.builtin.get_url:
       timeout: 300
   vars_prompt:
-    - name: prompt_install_nvidia
-      prompt: |-
-        [Warning] Some Autoware components depend on the CUDA, and TensorRT NVIDIA libraries which have end-user license agreements that should be reviewed before installation.
-        Install NVIDIA libraries? [y/N]
-      private: false
     - name: prompt_download_artifacts
       prompt: |-
         [Warning] Should the ONNX model files and other artifacts be downloaded alongside setting up the development environment.
@@ -36,12 +38,6 @@
           - cuda_version: "{{ cuda_version | default('(role default)') }}"
           - tensorrt_version: "{{ tensorrt_version | default('(role default)') }}"
 
-    - name: Show a warning if the NVIDIA libraries will not be installed
-      ansible.builtin.pause:
-        seconds: 10
-        prompt: |
-          [Warning] Skipping installation of NVIDIA libraries. Please manually install them if you plan to use any dependent components.
-      when: prompt_install_nvidia != 'y'
   roles:
     # Autoware base dependencies
     - role: autoware.dev_env.ros2
@@ -52,17 +48,15 @@
     - role: autoware.dev_env.gdown
     - role: autoware.dev_env.build_tools
     - role: autoware.dev_env.agnocast
-      when: rosdistro == 'humble'
+      when: rosdistro in ['humble', 'jazzy']
 
     # Autoware module dependencies
     - role: autoware.dev_env.acados
     - role: autoware.dev_env.geographiclib
     - role: autoware.dev_env.cuda
-      when: prompt_install_nvidia == 'y'
+      when: cuda_install | default(false) | bool
     - role: autoware.dev_env.tensorrt
-      when: prompt_install_nvidia == 'y'
     - role: autoware.dev_env.spconv
-      when: prompt_install_nvidia == 'y'
 
     # Autoware devel dependencies
     - role: autoware.dev_env.dev_tools

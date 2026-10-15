@@ -21,14 +21,15 @@ print_help() {
     echo "  -h              Display this help message"
     echo "  -y              Use non-interactive mode"
     echo "  -v              Enable debug outputs"
-    echo "  --no-nvidia     Disable installation of the NVIDIA-related roles ('cuda' and 'tensorrt')"
+    echo "  --install-cuda  Install CUDA toolkit (default: use factory installation)"
     echo "  --no-cuda-drivers Disable installation of 'cuda-drivers' in the role 'cuda'"
     echo "  --runtime       Disable installation dev package of role 'cuda' and 'tensorrt'"
     echo "  --data-dir      Set data directory (default: $HOME/autoware_data/ml_models)"
     echo "  --download-artifacts"
-    echo "                  Download artifacts"
+    echo "                  Download artifacts (default: disabled)"
+    echo "  --no-artifacts  Do not download artifacts (default)"
     echo "  --module        Specify the module (default: all)"
-    echo "  --ros-distro    Specify ROS distribution (humble or jazzy, default: humble)"
+    echo "  --ros-distro    Specify ROS distribution (humble or jazzy, default: jazzy)"
     echo ""
 }
 
@@ -37,6 +38,8 @@ SCRIPT_DIR=$(readlink -f "$(dirname "$0")")
 # Parse arguments
 args=()
 option_data_dir="$HOME/autoware_data/ml_models"
+option_install_cuda=false
+option_no_cuda_drivers=true
 
 while [ "$1" != "" ]; do
     case "$1" in
@@ -52,9 +55,12 @@ while [ "$1" != "" ]; do
         # Enable debug outputs.
         option_verbose=true
         ;;
-    --no-nvidia)
-        # Disable installation of the NVIDIA-related roles ('cuda' and 'tensorrt').
-        option_no_nvidia=true
+    --install-cuda)
+        option_install_cuda=true
+        ;;
+    --no-nvidia | --install-nvidia)
+        echo "Use --install-cuda to enable CUDA installation; TensorRT/spconv are always enabled." >&2
+        exit 2
         ;;
     --no-cuda-drivers)
         # Disable installation of 'cuda-drivers' in the role 'cuda'.
@@ -70,8 +76,10 @@ while [ "$1" != "" ]; do
         shift
         ;;
     --download-artifacts)
-        # Set download artifacts option
         option_download_artifacts=true
+        ;;
+    --no-artifacts)
+        option_download_artifacts=false
         ;;
     --module)
         option_module="$2"
@@ -119,12 +127,8 @@ if [ "$option_verbose" = "true" ]; then
     ansible_args+=("-vvv")
 fi
 
-# Check installation of NVIDIA libraries
-if [ "$option_no_nvidia" = "true" ]; then
-    ansible_args+=("--extra-vars" "prompt_install_nvidia=n")
-elif [ "$option_yes" = "true" ]; then
-    ansible_args+=("--extra-vars" "prompt_install_nvidia=y")
-fi
+# CUDA is independent of TensorRT/spconv. Preserve the factory toolkit by default.
+ansible_args+=("--extra-vars" "cuda_install=$option_install_cuda")
 
 # Check installation of CUDA Drivers
 if [ "$option_no_cuda_drivers" = "true" ]; then
@@ -139,17 +143,13 @@ else
     ansible_args+=("--extra-vars" "install_devel=y")
 fi
 
-# Check downloading artifacts
-if [ "$target_playbook" = "autoware.dev_env.openadkit" ]; then
-    if [ "$option_download_artifacts" = "true" ]; then
-        echo -e "\e[36mArtifacts will be downloaded to $option_data_dir\e[m"
-        ansible_args+=("--extra-vars" "prompt_download_artifacts=y")
-    else
-        ansible_args+=("--extra-vars" "prompt_download_artifacts=N")
-    fi
-elif [ "$option_yes" = "true" ] || [ "$option_download_artifacts" = "true" ]; then
+# Check downloading artifacts. The Thor image already contains the required
+# runtime assets, so downloads are opt-in even in non-interactive mode.
+if [ "$option_download_artifacts" = "true" ]; then
     echo -e "\e[36mArtifacts will be downloaded to $option_data_dir\e[m"
     ansible_args+=("--extra-vars" "prompt_download_artifacts=y")
+else
+    ansible_args+=("--extra-vars" "prompt_download_artifacts=n")
 fi
 
 ansible_args+=("--extra-vars" "data_dir=$option_data_dir")
@@ -159,8 +159,8 @@ if [ "$option_module" != "" ]; then
     ansible_args+=("--extra-vars" "module=$option_module")
 fi
 
-# Set ros-distro (default: humble)
-option_ros_distro="${option_ros_distro:-humble}"
+# Default to ROS 2 Jazzy; callers can override it with --ros-distro.
+option_ros_distro="${option_ros_distro:-jazzy}"
 export ROS_DISTRO="$option_ros_distro"
 ansible_args+=("--extra-vars" "rosdistro=$option_ros_distro")
 
@@ -172,20 +172,20 @@ fi
 
 # Install git
 if ! (command -v git >/dev/null 2>&1); then
-    sudo apt-get -y update
-    sudo apt-get -y install git
+    sudo --preserve-env=http_proxy,https_proxy,all_proxy,no_proxy,HTTP_PROXY,HTTPS_PROXY,ALL_PROXY,NO_PROXY apt-get -y update
+    sudo --preserve-env=http_proxy,https_proxy,all_proxy,no_proxy,HTTP_PROXY,HTTPS_PROXY,ALL_PROXY,NO_PROXY apt-get -y install git
 fi
 
 # Install pip for ansible
 if ! (python3 -m pip --version >/dev/null 2>&1); then
-    sudo apt-get -y update
-    sudo apt-get -y install python3-pip python3-venv
+    sudo --preserve-env=http_proxy,https_proxy,all_proxy,no_proxy,HTTP_PROXY,HTTPS_PROXY,ALL_PROXY,NO_PROXY apt-get -y update
+    sudo --preserve-env=http_proxy,https_proxy,all_proxy,no_proxy,HTTP_PROXY,HTTPS_PROXY,ALL_PROXY,NO_PROXY apt-get -y install python3-pip python3-venv
 fi
 
 # Install pipx for ansible
 if ! (python3 -m pipx --version >/dev/null 2>&1); then
-    sudo apt-get -y update
-    sudo apt-get -y install pipx
+    sudo --preserve-env=http_proxy,https_proxy,all_proxy,no_proxy,HTTP_PROXY,HTTPS_PROXY,ALL_PROXY,NO_PROXY apt-get -y update
+    sudo --preserve-env=http_proxy,https_proxy,all_proxy,no_proxy,HTTP_PROXY,HTTPS_PROXY,ALL_PROXY,NO_PROXY apt-get -y install pipx
 fi
 
 # Install ansible
