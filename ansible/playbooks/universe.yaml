@@ -28,7 +28,7 @@
   pre_tasks:
     - name: Report loaded proxy configuration
       ansible.builtin.debug:
-        msg: "Proxy configuration loaded: {{ item }} (network connectivity has not been tested)."
+        msg: "Proxy configuration loaded: {{ item }}={{ lookup('env', item) or lookup('env', item | upper) }}"
       loop:
         - http_proxy
         - https_proxy
